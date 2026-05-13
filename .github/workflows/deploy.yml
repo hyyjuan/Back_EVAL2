@@ -27,27 +27,40 @@ jobs:
             ${{ secrets.DOCKERHUB_USERNAME }}/innovatech-backend:latest
             ${{ secrets.DOCKERHUB_USERNAME }}/innovatech-backend:${{ github.sha }}
 
-      - name: Deploy en ec2-back
+      - name: Copiar llave SSH a ec2-front
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ secrets.EC2_HOST }}
+          host: ${{ secrets.EC2_FRONT_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
-            echo '${{ secrets.DOCKERHUB_TOKEN }}' | \
-              docker login -u '${{ secrets.DOCKERHUB_USERNAME }}' --password-stdin
-            docker stop backend || true
-            docker rm   backend || true
-            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/innovatech-backend:latest
-            docker run -d \
-              --name backend \
-              --restart unless-stopped \
-              -p 3000:3000 \
-              -e PORT=3000 \
-              -e DB_HOST=10.0.2.102 \
-              -e DB_USER=root \
-              -e DB_PASSWORD=admin123 \
-              -e DB_NAME=proyecto_db \
-              -e DB_PORT=3306 \
-              ${{ secrets.DOCKERHUB_USERNAME }}/innovatech-backend:latest
-            docker image prune -f
+            mkdir -p ~/.ssh
+            echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/llave.pem
+            chmod 600 ~/.ssh/llave.pem
+
+      - name: Deploy en ec2-back via ec2-front
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_FRONT_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            ssh -o StrictHostKeyChecking=no \
+              -i ~/.ssh/llave.pem \
+              ec2-user@${{ secrets.EC2_BACK_PRIVATE_IP }} \
+              "echo '${{ secrets.DOCKERHUB_TOKEN }}' | docker login -u '${{ secrets.DOCKERHUB_USERNAME }}' --password-stdin && \
+               docker stop backend || true && \
+               docker rm backend || true && \
+               docker pull ${{ secrets.DOCKERHUB_USERNAME }}/innovatech-backend:latest && \
+               docker run -d \
+                 --name backend \
+                 --restart unless-stopped \
+                 -p 3000:3000 \
+                 -e PORT=3000 \
+                 -e DB_HOST=${{ secrets.EC2_DATA_PRIVATE_IP }} \
+                 -e DB_USER=root \
+                 -e DB_PASSWORD=admin123 \
+                 -e DB_NAME=proyecto_db \
+                 -e DB_PORT=3306 \
+                 ${{ secrets.DOCKERHUB_USERNAME }}/innovatech-backend:latest && \
+               docker image prune -f"
