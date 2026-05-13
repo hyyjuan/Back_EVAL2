@@ -44,7 +44,7 @@ jobs:
               --restart unless-stopped \
               -p 3000:3000 \
               -e PORT=3000 \
-              -e DB_HOST=10.0.2.196 \
+              -e DB_HOST=10.0.2.102 \
               -e DB_USER=root \
               -e DB_PASSWORD=admin123 \
               -e DB_NAME=proyecto_db \
