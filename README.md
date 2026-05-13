@@ -1,100 +1,88 @@
-# Backend - API REST con Node.js y Express
+# Innovatech Chile — Backend
 
-## Descripción
-Backend API desarrollado en JavaScript con Node.js y Express framework. Proporciona endpoints RESTful para la gestión de usuarios con conexión a base de datos MySQL.
+API REST para el sistema de gestión de usuarios de Innovatech Chile.
+Desplegado en AWS EC2 con Docker y CI/CD automatizado via GitHub Actions.
 
-## Versiones y Herramientas Requeridas
+## Stack tecnológico
 
-### Lenguajes y Runtime
-- **Node.js**: Versión 18.0.0 o superior
-- **npm**: Versión 8.0.0 o superior (incluido con Node.js)
+- **Runtime:** Node.js 18
+- **Framework:** Express 4.18
+- **Base de datos:** MySQL 8.0
+- **Contenedor:** Docker (multi-stage build)
+- **CI/CD:** GitHub Actions + Docker Hub
+- **Infraestructura:** AWS EC2 en VPC
 
-### Dependencias Principales
-- **express**: ^4.18.2 - Framework web para Node.js
-- **cors**: ^2.8.5 - Middleware para habilitar CORS
-- **mysql2**: ^3.6.0 - Driver de MySQL para Node.js
-- **dotenv**: ^16.3.1 - Manejo de variables de entorno
+## Estructura del repositorio
 
-### Dependencias de Desarrollo
-- **nodemon**: ^3.0.1 - Para desarrollo con recarga automática
-
-## Instalación
-
-```bash
-# Instalar dependencias
-npm install
-
-# Instalar dependencias de desarrollo
-npm install --save-dev nodemon
+```
+.
+├── server.js              # Punto de entrada — API REST
+├── package.json           # Dependencias Node.js
+├── package-lock.json      # Versiones exactas de dependencias
+├── Dockerfile             # Multi-stage build (builder + runner)
+├── docker-compose.yml     # Stack completo: backend + MySQL
+├── initdb/
+│   └── 01_creacion_base_datos.sql  # Inicialización automática de MySQL
+├── .env.example           # Variables de entorno de referencia
+├── .gitignore             # Excluye .env y llaves
+└── .github/
+    └── workflows/
+        └── deploy.yml     # Pipeline CI/CD
 ```
 
-## Configuración
+## Cómo ejecutar localmente
 
-1. Copiar el archivo de variables de entorno:
 ```bash
+git clone https://github.com/hyyjuan/Back_EVAL2
+cd Back_EVAL2
 cp .env.example .env
+# Editar .env con tus valores
+docker compose up -d
+docker compose ps
+curl http://localhost:3000
 ```
 
-2. Editar el archivo `.env` con las credenciales de tu base de datos MySQL:
-```
-PORT=3000
-DB_HOST=localhost
-DB_USER=root
-DB_PASSWORD=tu_contraseña
-DB_NAME=proyecto_db
-DB_PORT=3306
-```
+## Endpoints disponibles
 
-## Ejecución
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| GET | / | Health check de la API |
+| GET | /api/usuarios | Listar todos los usuarios |
+| POST | /api/usuarios | Crear nuevo usuario |
+| PUT | /api/usuarios/:id | Actualizar usuario |
+| DELETE | /api/usuarios/:id | Eliminar usuario |
 
-```bash
-# Para producción
-npm start
+## Pipeline CI/CD
 
-# Para desarrollo (con recarga automática)
-npm run dev
-```
+El pipeline se activa automáticamente al hacer push a la rama `deploy`.
 
-## Endpoints de la API
+**Flujo:** push a deploy → build imagen Docker → push a Docker Hub → deploy en EC2 vía SSH
 
-### Usuarios
-- `GET /api/usuarios` - Obtener todos los usuarios
-- `POST /api/usuarios` - Crear un nuevo usuario
-- `PUT /api/usuarios/:id` - Actualizar un usuario existente
-- `DELETE /api/usuarios/:id` - Eliminar un usuario
+## Variables de entorno
 
-### Ejemplo de uso
-```bash
-# Obtener todos los usuarios
-curl http://localhost:3000/api/usuarios
+| Variable | Descripción | Default |
+|----------|-------------|---------|
+| PORT | Puerto del servidor | 3000 |
+| DB_HOST | Host de MySQL | db |
+| DB_USER | Usuario MySQL | root |
+| DB_PASSWORD | Contraseña MySQL | — |
+| DB_NAME | Nombre de la BD | proyecto_db |
+| DB_PORT | Puerto MySQL | 3306 |
 
-# Crear un nuevo usuario
-curl -X POST http://localhost:3000/api/usuarios \
-  -H "Content-Type: application/json" \
-  -d '{"nombre":"Juan Pérez","email":"juan@example.com","edad":25}'
-```
+## GitHub Secrets requeridos
 
-## Puertos Requeridos
+- `DOCKERHUB_USERNAME` — usuario de Docker Hub
+- `DOCKERHUB_TOKEN` — token de acceso Docker Hub
+- `EC2_HOST` — IP pública de ec2-back
+- `EC2_USER` — ec2-user
+- `EC2_SSH_KEY` — contenido del archivo .pem
 
-### Para funcionamiento en contenedor:
-- **Puerto 3000**: Puerto del servidor backend (HTTP)
-- **Puerto 3306**: Puerto de conexión a base de datos MySQL (externo)
+## Decisiones técnicas
 
-### Explicación de puertos:
-- **3000**: Es el puerto donde escucha el servidor Express para recibir peticiones HTTP
-- **3306**: Es el puerto estándar para comunicación con el servidor MySQL
+**Multi-stage build:** separa el entorno de construcción del de ejecución, generando imágenes más livianas y seguras sin herramientas de desarrollo innecesarias.
 
-## Estructura del Proyecto
-```
-backend/
-├── server.js          # Archivo principal del servidor
-├── package.json       # Configuración de dependencias
-├── .env.example       # Ejemplo de variables de entorno
-├── .env              # Variables de entorno (crear manualmente)
-└── README.md         # Este archivo
-```
+**Usuario no root:** el contenedor corre con un usuario sin privilegios aplicando el principio de mínimo privilegio.
 
-## Notas Importantes
-- Asegúrate de tener MySQL instalado y corriendo antes de iniciar el backend
-- La base de datos `proyecto_db` debe existir (ver proyecto `database/`)
-- El servidor se reiniciará automáticamente en modo desarrollo si usas `npm run dev`
+**Named volume:** se eligió named volume sobre bind mount porque Docker gestiona el almacenamiento automáticamente, es más portable y no expone rutas del sistema host al contenedor.
+
+**Docker Hub sobre ECR:** AWS Academy genera credenciales temporales que rotan cada pocas horas, lo que hace inviable ECR en pipelines automáticos. Docker Hub usa credenciales permanentes almacenadas como GitHub Secrets.
